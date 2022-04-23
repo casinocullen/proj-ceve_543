@@ -14,9 +14,11 @@
 # Load packages
 using CSV
 using DataFrames
+using Dates
 #using Chain
 using Plots
 using StatsBase
+using StatsPlots
 using Turing
 using DynamicHMC
 using StateSpaceModels
@@ -25,6 +27,19 @@ using StateSpaceModels
 # Load O3 data from 0.data_prep.jl
 o3_all_years_daily = DataFrame(CSV.File("./output/o3_all_years_daily.csv"))
 o3_all_years_monthly = DataFrame(CSV.File("./output/o3_all_years_monthly.csv"))
+
+
+# Find parameters p,d,q
+
+#Plot ACF and PACF plots
+diff_series = diff(o3_all_years_monthly.o3_mean)
+total_lags = 20
+s1 = scatter(collect(1:total_lags), autocor(diff_series, collect(1:total_lags)), title = "ACF")
+s2 = scatter(collect(1:total_lags), pacf(diff_series, collect(1:total_lags)), title = "PACF")
+p_acf_pacf = plot(s1, s2, layout = (2, 1))
+savefig(p_acf_pacf, "./vis/1.arima_acf_pacf.png")
+
+
 
 ############################################################
 ### Build an ARIMA model with order (1, 1, 0)
@@ -55,18 +70,25 @@ o3_all_years_monthly = DataFrame(CSV.File("./output/o3_all_years_monthly.csv"))
 	return tnew, xnew
 end;
 
-chains = let
+chains = begin
 	sampler = DynamicNUTS()
 	n_per_chain = 5000
 	nchains = 4
 	Turing.sample(ARIMA110(o3_all_years_monthly.o3_mean), sampler, MCMCThreads(), n_per_chain, nchains, drop_warmup=true, N_forecast=10)
+	#sample(ar_trend_model, sampler, 5_000, drop_warmup=true, N_forecast=N_forecast)
 end;
+p_chains = plot(chains)
+savefig(p_chains, "./vis/1.arima_chain_check.png")
+
 
 xnew = let
 	chains_params = Turing.MCMCChains.get_sections(chains, :parameters)
 	generated_quantities(ARIMA110(o3_all_years_monthly.o3_mean), chains_params) 
 end;
+p_chains = plot(chains)
+savefig(p_chains, "./vis/1.arima_chain_check.png")
 
+# Make forecast using ARIMA(1,1,0)
 p_arima_forecast = scatter(o3_all_years_monthly.date_num, o3_all_years_monthly.o3_mean, label="Obs", xlabel="# of Month", legend=:topleft)
 for i in 1:1000
     tt, yy = rand(xnew)
