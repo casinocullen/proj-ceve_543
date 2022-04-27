@@ -13,6 +13,7 @@
 
 # Load packages
 using CSV
+using Plots
 using DataFrames
 using Lathe.preprocess: TrainTestSplit
 using ScikitLearn, Random
@@ -79,5 +80,6 @@ savefig(p_random_forest_2021, "./vis/2.random_forest_validation_2021.png")
 
 # Validation
 r_squared_score(y_pred_2021, y_2021)
+
 
 

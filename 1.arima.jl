@@ -22,7 +22,7 @@ using StatsPlots
 using Turing
 using DynamicHMC
 using StateSpaceModels
-
+using Optim
 
 # Load O3 data from 0.data_prep.jl
 o3_all_years_daily = DataFrame(CSV.File("./output/o3_all_years_daily.csv"))
@@ -70,6 +70,9 @@ savefig(p_acf_pacf, "./vis/1.arima_acf_pacf.png")
 	return tnew, xnew
 end;
 
+# Find the optimized parameters using MLE
+optimize(ARIMA110(o3_all_years_monthly.o3_mean), MLE(), NelderMead())
+
 chains = begin
 	sampler = DynamicNUTS()
 	n_per_chain = 5000
@@ -78,6 +81,9 @@ chains = begin
 	#sample(ar_trend_model, sampler, 5_000, drop_warmup=true, N_forecast=N_forecast)
 end;
 p_chains = plot(chains)
+
+print(summarystats(chains))
+
 savefig(p_chains, "./vis/1.arima_chain_check.png")
 
 
@@ -89,12 +95,16 @@ p_chains = plot(chains)
 savefig(p_chains, "./vis/1.arima_chain_check.png")
 
 # Make forecast using ARIMA(1,1,0)
-p_arima_forecast = scatter(o3_all_years_monthly.date_num, o3_all_years_monthly.o3_mean, label="Obs", xlabel="# of Month", legend=:topleft)
+p_arima_forecast = scatter(o3_all_years_monthly.date_num, o3_all_years_monthly.o3_mean, label="Obs", 
+xlabel="Month", ylabel = "O3 Conc. (ppb)", legend=:topleft)
+	
 for i in 1:1000
     tt, yy = rand(xnew)
     label = i == 1 ? "Forecast" : ""
     plot!(p_arima_forecast, tt, yy, color=:gray, label=label, linewidth=0.125)
 end
+plot!(p_arima_forecast, mean(first.(xnew)), mean(last.(xnew)), color=:red, label="Mean", linewidth=1)
+
 savefig(p_arima_forecast, "./vis/1.arima_forecast.png")
 
 ############################################################
